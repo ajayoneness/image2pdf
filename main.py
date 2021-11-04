@@ -1,7 +1,8 @@
 from datetime import datetime
 import os
+from random import randint
 import MySQLdb
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_file
 from flask_mysqldb import MySQL
 from werkzeug.utils import secure_filename
 
@@ -9,6 +10,8 @@ from werkzeug.utils import secure_filename
 class MyServer:
     def __init__(self):
         self.tname = f"ajay"
+        self.fname = f"{randint(1,1000)}"
+        self.path = f"static/download/img2pdf{self.fname}.pdf"
 
 
 app=Flask(__name__)
@@ -76,27 +79,41 @@ def upload():
 @app.route('/convert',methods=['GET','POST'])
 def convert():
     cur = mysql.connection.cursor()
+    file_name = request.form['text']
     dbimg = cur.execute(f'select * from {obj.tname}')
 
     if dbimg > 0:
         dbimages=[]
         dbimage = cur.fetchall()
-        for i in dbimage:
-            dbimages=(f"{i[0]}")
+        imgs=[f'static/uploads/{i[0]}' for i in dbimage]
+        #converting..........................
+
+        import img2pdf
+        try:
+            if file_name == "" or file_name == " " or file_name == "  " or file_name == None:
+                with open(f'{obj.path}', 'wb') as f:
+                    f.write(img2pdf.convert(imgs))
+                    f.close()
+            else:
+                with open(f'static/download/img2pdf{file_name}.pdf', 'wb') as f:
+                    f.write(img2pdf.convert(imgs))
+                    f.close()
+
+            cur = mysql.connection.cursor()
+            cur.execute(f'TRUNCATE TABLE {obj.tname}')
+            cur.close()
+            con='converted'
+        except:
+            con="no file selected....."
     else:
         dbimages = ''
     con="converted sucessfully"
-    return render_template('index.html',convert=con, im=dbimage)
-
-
-
-
-
+    return render_template('index.html',convert=con)
 
 
 @app.route('/download',methods=['GET','POST'])
 def download():
-    return render_template('download.html')
+    return send_file(obj.path,as_attachment=True)
 
 @app.route('/about')
 def about():
@@ -108,4 +125,4 @@ def contact():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=8000)
